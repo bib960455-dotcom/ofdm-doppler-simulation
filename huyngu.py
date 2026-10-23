@@ -142,39 +142,60 @@ else:
                 })
     df_eval = pd.DataFrame(eval_list)
 
-    # --- DÒNG ĐÁNH GIÁ DỮ LIỆU TỔNG QUAN (EXECUTIVE SUMMARY) ---
-    st.markdown("### 📌 Đánh giá Dữ liệu Tổng quan Hệ thống")
+    # --- DÒNG ĐÁNH GIÁ DỮ LIỆU TỔNG QUAN (EXECUTIVE SUMMARY NÂNG CẤP) ---
+    st.markdown("### 📌 Đánh giá Dữ liệu Tổng quan & Phân tích Chuyên sâu Hệ thống")
     
     total_cases = len(df_eval)
     good_cases = len(df_eval[df_eval["Trạng thái"] == "Tốt"])
+    med_cases = len(df_eval[df_eval["Trạng thái"] == "Trung bình"])
     bad_cases = len(df_eval[df_eval["Trạng thái"] == "Suy hao nặng"])
     avg_ber = df_eval["BER"].mean()
     max_ber = df_eval["BER"].max()
+    max_ici = df_eval["ICI Power"].max()
     min_tc = df_eval["Coherence Time (ms)"].min()
     
-    # Tạo các cột hiển thị thẻ đánh giá tổng quan
+    # Hiển thị thẻ chỉ số trực quan
     col_sum1, col_sum2, col_sum3, col_sum4 = st.columns(4)
-    col_sum1.metric("📊 Tổng điểm khảo sát", f"{total_cases} cấu hình")
-    col_sum2.metric("🟢 Tỷ lệ đạt (Tốt)", f"{round((good_cases/total_cases)*100, 1)}%")
-    col_sum3.metric("🔴 Tỷ lệ suy hao nặng", f"{round((bad_cases/total_cases)*100, 1)}%")
-    col_sum4.metric("⏱️ Thời gian đồng kết tối thiểu", f"{round(min_tc, 2)} ms")
+    col_sum1.metric("📊 Tổng cấu hình khảo sát", f"{total_cases} trường hợp")
+    col_sum2.metric("🟢 Tỷ lệ Đạt (Tốt)", f"{round((good_cases/total_cases)*100, 1)}%")
+    col_sum3.metric("🔴 Tỷ lệ Suy hao nặng", f"{round((bad_cases/total_cases)*100, 1)}%")
+    col_sum4.metric("⏱️ Thời gian đồng kết ($T_c$ min)", f"{round(min_tc, 2)} ms")
 
-    # Nhận định tóm tắt bằng văn bản
-    if bad_cases / total_cases > 0.5:
-        summary_comment = "⚠️ **Nhận định chung:** Hệ thống chịu ảnh hưởng cực kỳ nghiêm trọng bởi hiệu ứng Doppler ở các dải vận tốc cao và tần số lớn. Khuyến nghị bắt buộc phải sử dụng khoảng cách sóng mang con (**SCS lớn hơn**) hoặc áp dụng các **thuật toán cân bằng kênh (Equalization)** chuyên sâu để giảm thiểu nhiễu ICI."
-    elif bad_cases / total_cases > 0.2:
-        summary_comment = "⚡ **Nhận định chung:** Hệ thống duy trì ổn định ở dải tốc độ thấp đến trung bình, tuy nhiên bắt đầu xuất hiện hiện tượng sàn lỗi (*BER floor*) và suy hao đáng kể khi phương tiện di chuyển trên 300 km/h ở các băng tần cao."
-    else:
-        summary_comment = "✅ **Nhận định chung:** Cấu hình hệ thống hiện tại có khả năng chống chịu tốt với hiệu ứng Doppler trong dải thông số đã chọn, giữ cho tỷ lệ lỗi bit (BER) ở ngưỡng chấp nhận được."
+    # Hiển thị thêm chỉ số chi tiết phụ
+    sub_col1, sub_col2, sub_col3 = st.columns(3)
+    sub_col1.metric("📉 Tỷ lệ lỗi bit trung bình (Avg BER)", f"{format(avg_ber, '.4f')}")
+    sub_col2.metric("📈 Tỷ lệ lỗi bit lớn nhất (Max BER)", f"{format(max_ber, '.4f')}")
+    sub_col3.metric("⚡ Công suất nhiễu ICI cực đại", f"{format(max_ici, '.4f')}")
+
+    # Nhận định tóm tắt chi tiết bằng văn bản
+    st.markdown("---")
+    st.markdown("#### 🔍 Giải thích Cơ chế Vật lý & Đánh giá Tác động:")
     
-    st.info(summary_comment)
+    detailed_explanation = f"""
+    1. **Mối quan hệ giữa Vận tốc và Dịch chuyển Doppler ($f_d$):** Khi phương tiện di chuyển ở tốc độ cao (đặc biệt từ $300$ km/h trở lên) trong các dải tần số cao ($3.5$ GHz - $5.0$ GHz), tần số dịch chuyển Doppler tăng mạnh. Điều này làm thay đổi pha tín hiệu liên tục trong một ký tự OFDM.
+    2. **Nguyên nhân gây nhiễu liên sóng mang (ICI - Inter-Carrier Interference):** 
+       - Trực giao giữa các sóng mang con phụ thuộc hoàn toàn vào khoảng cách sóng mang con (**SCS**). 
+       - Khi sử dụng SCS nhỏ ($15$ kHz), độ dịch Doppler dễ vượt quá giới hạn an toàn (thường ngưỡng Doppler vượt quá $5\% - 10\%$ SCS sẽ gây ra ICI nghiêm trọng). 
+       - Ngược lại, việc lựa chọn **SCS lớn hơn ($60$ kHz hoặc $120$ kHz)** giúp nới rộng khoảng cách giữa các sóng mang, từ đó triệt tiêu bớt ảnh hưởng của ICI.
+    3. **Thời gian đồng kết kênh truyền ($T_c$):** Với thời gian đồng kết tối thiểu đo được là **{round(min_tc, 2)} ms**, kênh truyền thay đổi cực kỳ nhanh chóng so với độ dài ký tự OFDM truyền thống, dẫn đến hiện tượng suy giảm biên độ sâu và sàn lỗi (*BER floor*).
+    """
+    st.info(detailed_explanation)
+
+    if bad_cases / total_cases > 0.5:
+        summary_comment = "⚠️ **Kết luận tổng quan:** Hệ thống chịu ảnh hưởng cực kỳ nghiêm trọng bởi hiệu ứng Doppler ở dải vận tốc cao. **Khuyến nghị bắt buộc:** Phải tăng khoảng cách sóng mang con (SCS) lên mức cao hơn hoặc ứng dụng các thuật toán cân bằng kênh (Equalization) và ước lượng kênh chuyên sâu nhằm triệt tiêu nhiễu ICI."
+    elif bad_cases / total_cases > 0.2:
+        summary_comment = "⚡ **Kết luận tổng quan:** Hệ thống vận hành ổn định ở tốc độ thấp đến trung bình, tuy nhiên xuất hiện suy hao rõ rệt khi phương tiện đạt vận tốc lớn ở các băng tần cao. Cần cân nhắc cấu hình linh hoạt tùy theo kịch bản triển khai thực tế."
+    else:
+        summary_comment = "✅ **Kết luận tổng quan:** Cấu hình hệ thống hiện tại có khả năng chống chịu tốt với hiệu ứng Doppler trong dải thông số đã chọn, giữ cho tỷ lệ lỗi bit (BER) nằm trong ngưỡng kiểm soát."
+    
+    st.warning(summary_comment)
     st.markdown("---")
 
     # --- HIỂN THỊ CÁC TAB GIAO DIỆN ---
     tab1, tab2, tab3 = st.tabs([
         "📊 Biểu đồ Phân tích (BER & ICI)", 
         "📋 Dữ liệu Số liệu Thô", 
-        "📑 Đánh giá Chuyên sâu (Theo 5 Tiêu Chí)"
+        "📑 Đánh giá Chuyên Sâu (Theo 5 Tiêu Chí)"
     ])
 
     with tab1:
@@ -227,6 +248,7 @@ else:
 
     with tab3:
         st.subheader("📑 Bảng Đánh Giá Chuyên Sâu Theo 5 Tiêu Chí Kỹ Thuật")
+        st.markdown("Bảng chi tiết phân tích từng tiêu chí kỹ thuật ứng với các cấu hình sóng mang, khoảng cách sóng mang con (SCS) và tốc độ di chuyển:")
         
         eval_display_list = []
         for row in eval_list:
@@ -237,8 +259,8 @@ else:
                 "1. BER": round(row["BER"], 5),
                 "2. ICI Power": round(row["ICI Power"], 5),
                 "3. Coherence Time (ms)": round(row["Coherence Time (ms)"], 2),
-                "4. Ảnh hưởng SCS": "Ít nhạy hơn" if row["SCS (kHz)"] >= 60 else "Nhạy cảm cao",
-                "5. Ảnh hưởng fc": "Suy hao lớn" if row["Tần số fc (GHz)"] >= 3.5 else "Ổn định hơn",
+                "4. Ảnh hưởng SCS": "Ít nhạy hơn (Kháng ICI tốt)" if row["SCS (kHz)"] >= 60 else "Nhạy cảm cao (Dễ mất trực giao)",
+                "5. Ảnh hưởng fc": "Suy hao lớn (Dịch Doppler rộng)" if row["Tần số fc (GHz)"] >= 3.5 else "Ổn định hơn (D Doppler nhỏ)",
                 "Trạng thái": "🟢 Tốt" if row["Trạng thái"]=="Tốt" else ("🟡 Trung bình" if row["Trạng thái"]=="Trung bình" else "🔴 Suy hao nặng")
             })
             
